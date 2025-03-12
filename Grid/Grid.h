@@ -30,6 +30,6 @@ public:
 	static void DrawHorizonAxis(const AcGePoint3dArray& insert_point, const TCHAR* insert_att[]);
 	//AcDbObjectId CreateHorizonAxis();
 
-	//void DrawLogic();
+	void DrawLogic();
 };
 
