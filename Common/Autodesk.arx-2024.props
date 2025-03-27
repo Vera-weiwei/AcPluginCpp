@@ -7,10 +7,10 @@
   </PropertyGroup>
   <!--There is No 32 Bit AutoCAD Starting From AutoCAD 2020-->
   <PropertyGroup>
-    <AcadDir Condition="'$(Platform)'=='x64'">C:\Program Files\Autodesk\AutoCAD 2024\</AcadDir>
+    <AcadDir Condition="'$(Platform)'=='x64'">C:\Program Files\Autodesk\AutoCAD 2018\</AcadDir>
     <AcadExe Condition="'$(ArxAppType)'=='dbx' or '$(ArxAppType)'=='dbxnet' or '$(ArxAppType)'=='arx' or '$(ArxAppType)'=='arxnet'">acad.exe</AcadExe>
     <AcadExe Condition="'$(ArxAppType)'=='crx' or '$(ArxAppType)'=='crxnet'">accoreconsole.exe</AcadExe>
-    <ArxSdkDir>C:\Autodesk\ObjectARX_for_AutoCAD_2024_Win_64bit_dlm\</ArxSdkDir>
+    <ArxSdkDir>C:\ObjectARX 2018</ArxSdkDir>
     <ArxSdkIncs Condition="'$(Platform)'=='x64'">$(ArxSdkDir)\inc;$(ArxSdkDir)\inc-x64</ArxSdkIncs>
     <ArxHlrIncs>$(ArxSdkDir)\utils\HlrApi\inc</ArxHlrIncs>
     <ArxAmodelerIncs>$(ArxSdkDir)\utils\amodeler\inc</ArxAmodelerIncs>
