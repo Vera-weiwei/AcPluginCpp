@@ -55,8 +55,11 @@ public:
 
 	static double GetDistancePointToLineSegment(const AcGePoint3d& point, const AcGePoint3d& line_segment_start, const AcGePoint3d& line_segment_end);
 	static double GetDistancePointToLineSegment(const AcGePoint3d& point, const AcGeLineSeg3d& line_segment);
-	static double GetDistancePointToLine(const AcGePoint3d& point, const AcGePoint3d& line_segment_start, const AcGePoint3d& line_segment_end);
+	static double GetDistancePointToLine(const AcGePoint3d& point, const AcGePoint3d& line_start, const AcGePoint3d& line_end);
 
+	static bool IsParallelLineSeg(const AcGePoint3d& line1_start, const AcGePoint3d& line1_end, const AcGePoint3d& line2_strat, const AcGePoint3d& line2_end);
+	static bool IsParallelLineSeg(const AcGeLineSeg3d& line1, const AcGeLineSeg3d& line2);
+	static bool IsParallelLine(const AcGePoint3d& line1_start, const AcGePoint3d& line1_end, const AcGePoint3d& line2_start, const AcGePoint3d& line2_end);
 	// math tools: Numerical tools
 	static double Max(const double& num1, const double& num2);
 	static double Min(const double& num1, const double& num2);
@@ -71,4 +74,9 @@ public:
 
 	// database tools
 	static AcDbObjectIdArray GetAllEntityIdsInDatabase(const TCHAR* layer_name = NULL, AcDbDatabase* database = acdbHostApplicationServices()->workingDatabase());
+
+	// IRM tools
+	static std::vector<int> CalculateReinforcement(int beam_width, int bar_diameter, int bars_num, int cover_thickness, int stirrup_diameter);
+	static int CalculateMaxBarsPerRow(int beam_width, int bar_diameter, int cover_thickness, int stirrup_diameter, int min_top_spacing, double top_spacing_factor);
+	static int CalculateMaxBars(int beam_width, int bar_diameter, int cover_thickness, int stirrup_diameter, int min_top_spacing, double top_spacing_factor);
 };

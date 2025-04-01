@@ -90,7 +90,7 @@ Acad::ErrorStatus CPolaCustomBeam::dwgOutFields(AcDbDwgFiler * pFiler) const {
 	es = pFiler->writeItem(beam_h_);
 	if (es != Acad::eOk)
 		return es;
-	for (int i = 0; i < vertexes_num_;i++)
+	for (int i = 0; i < vertexes_num_; i++)
 	{
 		es = pFiler->writeItem(beam_viewable_.at(i));
 		if (es != Acad::eOk)
@@ -99,6 +99,12 @@ Acad::ErrorStatus CPolaCustomBeam::dwgOutFields(AcDbDwgFiler * pFiler) const {
 	es = pFiler->writeItem(beam_property_);
 	if (es != Acad::eOk)
 		return es;
+	for (int i = 0;i < vertexes_num_; i++)
+	{
+		es = pFiler->writeItem(beam_segment_direction_.at(i));
+		if (es != Acad::eOk)
+			return es;
+	}
 	return (pFiler->filerStatus());
 }
 
@@ -129,6 +135,7 @@ Acad::ErrorStatus CPolaCustomBeam::dwgInFields(AcDbDwgFiler * pFiler) {
 	beam_vertexes_.setLogicalLength(vertexes_num_);
 	top_offset_vertex_.setLogicalLength(vertexes_num_);
 	bottom_offset_vertex_.setLogicalLength(vertexes_num_);
+	beam_segment_direction_.setLogicalLength(vertexes_num_);
 	for (int i = 0; i < vertexes_num_; i++)
 	{
 		es = pFiler->readItem(&beam_vertexes_.at(i));
@@ -163,6 +170,12 @@ Acad::ErrorStatus CPolaCustomBeam::dwgInFields(AcDbDwgFiler * pFiler) {
 	es = pFiler->readItem(&beam_property_);
 	if (es != Acad::eOk)
 		return es;
+	for (int i = 0;i < vertexes_num_;i++)
+	{
+		es = pFiler->readItem(&beam_segment_direction_.at(i));
+		if (es != Acad::eOk)
+			return es;
+	}
 	return (pFiler->filerStatus());
 }
 
@@ -449,12 +462,22 @@ Adesk::Int32 CPolaCustomBeam::getVertexesNum() const
 double CPolaCustomBeam::getBeamLength() const
 {
 	assertReadEnabled();
-	double length = 0;
-	for (int i = 0;i < vertexes_num_ - 1;i++)
+	double length = 0.0;
+	for (int i = 0; i < vertexes_num_ - 1; i++)
 	{
-		length += beam_vertexes_.at(i).distanceTo(beam_vertexes_.at(i + 1));
+		length += beam_vertexes_[i].distanceTo(beam_vertexes_[i + 1]);
+	}
+
+	if (IsBeamClosed() && vertexes_num_ > 2)
+	{
+		length += beam_vertexes_[vertexes_num_ - 1].distanceTo(beam_vertexes_[0]);
 	}
 	return length;
+}
+
+Adesk::Int32 CPolaCustomBeam::getBeamSegmentNum() const
+{
+	return beam_vertexes_.length() - 1;
 }
 
 bool CPolaCustomBeam::IsBeamClosed() const
@@ -465,45 +488,47 @@ bool CPolaCustomBeam::IsBeamClosed() const
 AcGeVector3dArray CPolaCustomBeam::getBeamSegmentDirection() const
 {
 	assertReadEnabled();
-	return beam_segment_direction;
+	return beam_segment_direction_;
 }
 
 AcGePoint3d CPolaCustomBeam::getHorizontalMidPoint() const
 {
-	assertReadEnabled();
-	double sum_x = 0.0, sum_y = 0.0, sum_z = 0.0;
-	int horizontal_segment_count = 0;
+	if (vertexes_num_ <= 0)
+		return AcGePoint3d(6496, 6496, 6496);
 
-	for (int i = 0; i < beam_vertexes_.length() - 1; ++i)
+	if (vertexes_num_ == 1)
+		return beam_vertexes_[0];
+
+	double total_length = getBeamLength();
+
+	double half_length = total_length / 2.0;
+	double current_length = 0.0;
+
+	for (int i = 0; i < vertexes_num_ - 1; i++)
 	{
-		AcGePoint3d start = beam_vertexes_[i];
-		AcGePoint3d end = beam_vertexes_[i + 1];
+		double segment_length = beam_vertexes_[i].distanceTo(beam_vertexes_[i + 1]);
 
-		if (fabs(start.z - end.z) < AcGeContext::gTol.equalPoint())
+		if (current_length + segment_length >= half_length)
 		{
-			double mid_x = (start.x + end.x) / 2.0;
-			double mid_y = (start.y + end.y) / 2.0;
-			double mid_z = (start.z + end.z) / 2.0;
+			double ratio = (half_length - current_length) / segment_length;
+			AcGeVector3d direction = beam_vertexes_[i + 1] - beam_vertexes_[i];
+			return beam_vertexes_[i] + direction * ratio;
+		}
 
-			sum_x += mid_x;
-			sum_y += mid_y;
-			sum_z += mid_z;
-			horizontal_segment_count++;
+		current_length += segment_length;
+	}
+	if (IsBeamClosed() && vertexes_num_ > 2)
+	{
+		double segment_length = beam_vertexes_[vertexes_num_ - 1].distanceTo(beam_vertexes_[0]);
+
+		if (current_length + segment_length >= half_length)
+		{
+			double ratio = (half_length - current_length) / segment_length;
+			AcGeVector3d direction = beam_vertexes_[0] - beam_vertexes_[vertexes_num_ - 1];
+			return beam_vertexes_[vertexes_num_ - 1] + direction * ratio;
 		}
 	}
-
-	if (horizontal_segment_count == 0)
-	{
-		for (int i = 0; i < beam_vertexes_.length(); ++i)
-		{
-			sum_x += beam_vertexes_[i].x;
-			sum_y += beam_vertexes_[i].y;
-			sum_z += beam_vertexes_[i].z;
-		}
-		return AcGePoint3d(sum_x / beam_vertexes_.length(), sum_y / beam_vertexes_.length(), sum_z / beam_vertexes_.length());
-	}
-
-	return AcGePoint3d(sum_x / horizontal_segment_count, sum_y / horizontal_segment_count, sum_z / horizontal_segment_count);
+	return beam_vertexes_[0];
 }
 
 void CPolaCustomBeam::setBeamVertexes(const AcGePoint3dArray & beam_vertexes)
@@ -551,12 +576,6 @@ void CPolaCustomBeam::setBeamProperty(const Adesk::Int32 & beam_property)
 {
 	assertWriteEnabled();
 	beam_property_ = beam_property;
-}
-
-void CPolaCustomBeam::setBeamSegmentDireciton(const AcGeVector3dArray & segment_direction)
-{
-	assertWriteEnabled();
-	beam_segment_direction = segment_direction;
 }
 
 void CPolaCustomBeam::addVertexAt(const int index, const AcGePoint3d & vertex)
@@ -617,10 +636,11 @@ void CPolaCustomBeam::UpdateOffsetLine(const double& distance)
 void CPolaCustomBeam::GenerateBeamSegmentDirection()
 {
 	assertWriteEnabled();
-	beam_segment_direction.removeAll();
+	beam_segment_direction_.removeAll();
+	beam_segment_direction_.append(AcGeVector3d::kIdentity);
 	for (int i = 0;i < beam_vertexes_.length() - 1;i++)
 	{
-		beam_segment_direction.append(BasicTools::GetVectorBetweenTwoPoint(beam_vertexes_.at(i), beam_vertexes_.at(i + 1)));
+		beam_segment_direction_.append(BasicTools::GetVectorBetweenTwoPoint(beam_vertexes_.at(i), beam_vertexes_.at(i + 1)));
 	}
 }
 
@@ -696,6 +716,7 @@ AcDbObjectId CPolaCustomBeam::DrawBeamWithOffset(CPolaCustomBeam * beam, const d
 		}
 	}
 
+	beam->GenerateBeamSegmentDirection();
 	beam_id = AddToModelSpace::AddEntityToModelSpace(beam);
 
 	previous_point = current_point;
@@ -744,6 +765,8 @@ AcDbObjectId CPolaCustomBeam::DrawBeamWithOffset(CPolaCustomBeam * beam, const d
 					acutPrintf(_T("Invalid input. Please enter 'Visible' or 'Invisible'.\n"));
 				}
 			}
+
+			beam_ptr->GenerateBeamSegmentDirection();
 			beam_ptr->close();
 		}
 
@@ -752,6 +775,13 @@ AcDbObjectId CPolaCustomBeam::DrawBeamWithOffset(CPolaCustomBeam * beam, const d
 
 		previous_point = current_point;
 		index++;
+	}
+
+	CPolaCustomBeam* beam_ptr = nullptr;
+	if (acdbOpenObject(beam_ptr, beam_id, AcDb::kForWrite) == Acad::eOk)
+	{
+		beam_ptr->GenerateBeamSegmentDirection();
+		beam_ptr->close();
 	}
 
 	beam->close();
@@ -838,6 +868,7 @@ AcDbObjectId CPolaCustomBeam::SelectPillarDrawBeam(CPolaCustomBeam * beam)
 		beam->setBeamVertexes(sort_vertex_array);
 		beam->setBeamViewable(viewable);
 		beam->UpdateOffsetLine(0.5 * beam->getBeamWidth());
+		beam->GenerateBeamSegmentDirection();
 		return AddToModelSpace::AddEntityToModelSpace(beam);
 	}
 	return AcDbObjectId::kNull;

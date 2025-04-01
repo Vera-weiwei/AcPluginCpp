@@ -202,9 +202,9 @@ double BasicTools::Min(const double& num1, const double& num2)
 int BasicTools::RandomInt(const int& min, const int& max)
 {
 	unsigned seed = static_cast<unsigned> (std::chrono::system_clock::now().time_since_epoch().count());
-    std::mt19937 random_generator(seed);
-    std::uniform_int_distribution<> int_distribution(min, max);
-    return int_distribution(random_generator);
+	std::mt19937 random_generator(seed);
+	std::uniform_int_distribution<> int_distribution(min, max);
+	return int_distribution(random_generator);
 }
 /// <summary>
 /// Calculate the coordinates of the midpoint of the line segment based on the offset distance
@@ -498,6 +498,55 @@ AcDbObjectIdArray BasicTools::GetAllEntityIdsInDatabase(const TCHAR* layer_name,
 	return all_entity_ids;
 }
 
+std::vector<int> BasicTools::CalculateReinforcement(int beam_width, int bar_diameter, int bars_num, int cover_thickness, int stirrup_diameter)
+{
+	int effective_width = beam_width - 2 * cover_thickness - 2 * stirrup_diameter;
+
+	int min_spacing_top = (std::max)(30, static_cast<int>(1.5 * bar_diameter));
+	int min_spacing_bottom = (std::max)(25, bar_diameter);
+
+	int max_bars_per_row = (effective_width + min_spacing_top) / (bar_diameter + min_spacing_top);
+
+	if (max_bars_per_row < 1)
+	{
+		max_bars_per_row = 1;
+	}
+	int rows = static_cast<int>(std::ceil(static_cast<double>(bars_num) / max_bars_per_row));
+	std::vector<int> bars_in_row(rows, 0);
+	int remaining_bars = bars_num;
+
+	for (int i = 0; i < rows; i++)
+	{
+		if (remaining_bars >= max_bars_per_row)
+		{
+			bars_in_row[i] = max_bars_per_row;
+			remaining_bars -= max_bars_per_row;
+		}
+		else
+		{
+			bars_in_row[i] = remaining_bars;
+			remaining_bars = 0;
+		}
+	}
+	return bars_in_row;
+}
+
+int BasicTools::CalculateMaxBarsPerRow(int beam_width, int bar_diameter, int cover_thickness, int stirrup_diameter, int min_spacing_required, double spacing_factor)
+{
+	int effective_width = beam_width - 2 * cover_thickness - 2 * stirrup_diameter;
+	int min_spacing = (std::max)(min_spacing_required, static_cast<int>(spacing_factor * bar_diameter));
+
+	int max_bars_per_row = (effective_width + min_spacing_required) / (bar_diameter + min_spacing_required);
+	return (std::max)(1, max_bars_per_row);
+}
+
+int BasicTools::CalculateMaxBars(int beam_width, int bar_diameter, int cover_thickness, int stirrup_diameter, int min_spacing, double spacing_factor)
+{
+	int max_bars_per_row = CalculateMaxBarsPerRow(beam_width, bar_diameter, cover_thickness, stirrup_diameter, min_spacing, spacing_factor);
+	int max_rows = 3;
+	return max_bars_per_row * max_rows;
+}
+
 /// <summary>
 /// Determine whether two points intersect.
 /// </summary>
@@ -597,20 +646,8 @@ AcGePoint3d BasicTools::ProjectPointToLineSegment(const AcGePoint3d& point, cons
 
 double BasicTools::GetDistancePointToLineSegment(const AcGePoint3d& point, const AcGePoint3d& line_segment_start, const AcGePoint3d& line_segment_end)
 {
-	AcGeVector3d v(line_segment_end - line_segment_start);
-	double len = v.length();
-	if (len == 0.0)
-		return point.distanceTo(line_segment_start);
-	v.normalize();
-	AcGeVector3d w(point - line_segment_start);
-	double c1 = w.dotProduct(v);
-	if (c1 <= 0)
-		return point.distanceTo(line_segment_start);
-	if (c1 >= len)
-		return point.distanceTo(line_segment_end);
-	v *= c1;
-	AcGePoint3d closest_point = line_segment_start + v;
-	return point.distanceTo(closest_point);
+	AcGeLineSeg3d line(line_segment_start,line_segment_end);
+	return line.distanceTo(point);
 }
 
 double BasicTools::GetDistancePointToLineSegment(const AcGePoint3d& point, const AcGeLineSeg3d& line_segment)
@@ -620,17 +657,31 @@ double BasicTools::GetDistancePointToLineSegment(const AcGePoint3d& point, const
 	return GetDistancePointToLineSegment(point, start_point, end_point);
 }
 
-double BasicTools::GetDistancePointToLine(const AcGePoint3d& point, const AcGePoint3d& line_segment_start, const AcGePoint3d& line_segment_end)
+double BasicTools::GetDistancePointToLine(const AcGePoint3d& point, const AcGePoint3d& line_start, const AcGePoint3d& line_end)
 {
-	AcGeVector3d v(line_segment_end - line_segment_start);
-	double len = v.length();
-	if (len == 0.0)
-		return point.distanceTo(line_segment_start);
+	AcGeLine3d line(line_start, line_end);
+	return line.distanceTo(point);
+}
 
-	v.normalize();
-	AcGeVector3d w(point - line_segment_start);
-	AcGeVector3d perp = w.crossProduct(v);
-	return perp.length();
+bool BasicTools::IsParallelLineSeg(const AcGePoint3d& line1_start, const AcGePoint3d& line1_end, const AcGePoint3d& line2_start, const AcGePoint3d& line2_end)
+{
+	AcGeLineSeg3d line1(line1_start, line1_end);
+	AcGeLineSeg3d line2(line2_start, line2_end);
+
+	return line1.isParallelTo(line2);
+}
+
+bool BasicTools::IsParallelLineSeg(const AcGeLineSeg3d& line1, const AcGeLineSeg3d& line2)
+{
+	return line1.isParallelTo(line2);
+}
+
+bool BasicTools::IsParallelLine(const AcGePoint3d& line1_start, const AcGePoint3d& line1_end, const AcGePoint3d& line2_start, const AcGePoint3d& line2_end)
+{
+	AcGeLine3d line1(line1_start, line1_end);
+	AcGeLine3d line2(line2_start, line2_end);
+
+	return line1.isParallelTo(line2);
 }
 
 /// <summary>
